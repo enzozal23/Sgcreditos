@@ -9,7 +9,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Nueva ruta personalizada prueba de webhook 2226 porfavor que ande
+// Nueva ruta personalizada
 Route::get('/bienvenido', function () {
     return view('bienvenido');
 });
@@ -18,6 +18,18 @@ Route::get('/bienvenido', function () {
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->name('dashboard');
+
+// Ruta para el webhook de deploy automático
+Route::post('/deploy', function () {
+    exec('/var/www/html/deploy.sh');
+    return response('Deploy iniciado', 200);
+});
+
+// Ruta para webhook POST (GitHub siempre usa POST)
+Route::post('/webhook/deploy', function () {
+    exec('/var/www/html/deploy.sh');
+    return response('Deploy iniciado', 200);
+})->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 // Rutas de Administración
 Route::middleware('auth')->group(function () {
@@ -38,32 +50,32 @@ Route::middleware('auth')->group(function () {
     })->name('admin.usuarios');
 });
 
-    // Rutas de Clientes
-    Route::middleware('auth')->group(function () {
-        // Ruta para obtener datos de DataTable (DEBE IR ANTES del resource)
-        Route::get('/clientes/data', [ClienteController::class, 'getData'])->name('clientes.data');
+// Rutas de Clientes
+Route::middleware('auth')->group(function () {
+    // Ruta para obtener datos de DataTable (DEBE IR ANTES del resource)
+    Route::get('/clientes/data', [ClienteController::class, 'getData'])->name('clientes.data');
     Route::get('/clientes/buscar', [ClienteController::class, 'buscar'])->name('clientes.buscar');
-        
-        // Rutas para CRUD de clientes por tipo
-        Route::get('/clientes/tipo/{tipoClienteId}', [ClienteController::class, 'clientesPorTipo'])->name('clientes.por.tipo');
-        Route::get('/clientes/tipo/{tipoClienteId}/data', [ClienteController::class, 'clientesPorTipoData'])->name('clientes.por.tipo.data');
-        Route::get('/clientes/tipo/{tipoClienteId}/campos', [ClienteController::class, 'clientesPorTipoCampos'])->name('clientes.por.tipo.campos');
-        Route::post('/clientes/tipo/{tipoClienteId}', [ClienteController::class, 'clientesPorTipoStore'])->name('clientes.por.tipo.store');
-        Route::get('/clientes/tipo/{tipoClienteId}/{id}/edit', [ClienteController::class, 'clientesPorTipoEdit'])->name('clientes.por.tipo.edit');
-        Route::put('/clientes/tipo/{tipoClienteId}/{id}', [ClienteController::class, 'clientesPorTipoUpdate'])->name('clientes.por.tipo.update');
-        Route::delete('/clientes/tipo/{tipoClienteId}/{id}', [ClienteController::class, 'clientesPorTipoDestroy'])->name('clientes.por.tipo.destroy');
-        
-        // Rutas de Clientes
-        Route::resource('clientes', ClienteController::class)->names([
-            'index' => 'clientes.index',
-            'create' => 'clientes.create',
-            'store' => 'clientes.store',
-            'show' => 'clientes.show',
-            'edit' => 'clientes.edit',
-            'update' => 'clientes.update',
-            'destroy' => 'clientes.destroy',
-        ]);
-    });
+    
+    // Rutas para CRUD de clientes por tipo
+    Route::get('/clientes/tipo/{tipoClienteId}', [ClienteController::class, 'clientesPorTipo'])->name('clientes.por.tipo');
+    Route::get('/clientes/tipo/{tipoClienteId}/data', [ClienteController::class, 'clientesPorTipoData'])->name('clientes.por.tipo.data');
+    Route::get('/clientes/tipo/{tipoClienteId}/campos', [ClienteController::class, 'clientesPorTipoCampos'])->name('clientes.por.tipo.campos');
+    Route::post('/clientes/tipo/{tipoClienteId}', [ClienteController::class, 'clientesPorTipoStore'])->name('clientes.por.tipo.store');
+    Route::get('/clientes/tipo/{tipoClienteId}/{id}/edit', [ClienteController::class, 'clientesPorTipoEdit'])->name('clientes.por.tipo.edit');
+    Route::put('/clientes/tipo/{tipoClienteId}/{id}', [ClienteController::class, 'clientesPorTipoUpdate'])->name('clientes.por.tipo.update');
+    Route::delete('/clientes/tipo/{tipoClienteId}/{id}', [ClienteController::class, 'clientesPorTipoDestroy'])->name('clientes.por.tipo.destroy');
+    
+    // Rutas de Clientes
+    Route::resource('clientes', ClienteController::class)->names([
+        'index' => 'clientes.index',
+        'create' => 'clientes.create',
+        'store' => 'clientes.store',
+        'show' => 'clientes.show',
+        'edit' => 'clientes.edit',
+        'update' => 'clientes.update',
+        'destroy' => 'clientes.destroy',
+    ]);
+});
 
 // Rutas de Créditos
 Route::middleware('auth')->group(function () {
@@ -135,22 +147,65 @@ Route::get('/test-datatable', function () {
     return view('test-datatable');
 })->name('test.datatable');
 
-           // Ruta temporal para probar DataTable sin autenticación
-           Route::get('/test-clientes-data', [ClienteController::class, 'getData'])->name('test.clientes.data');
-           
-           // Rutas para provincias
-           Route::get('/provincias', [ProvinciaController::class, 'index'])->name('provincias.index');
-           Route::get('/provincias/buscar', [ProvinciaController::class, 'buscar'])->name('provincias.buscar');
-           Route::get('/provincias/{id}', [ProvinciaController::class, 'show'])->name('provincias.show');
-           Route::get('/provincias/por-codigo', [ProvinciaController::class, 'porCodigo'])->name('provincias.porCodigo');
-           Route::get('/provincias/{id}/localidades', [ProvinciaController::class, 'conLocalidades'])->name('provincias.conLocalidades');
-           
-           // Rutas para localidades
-           Route::get('/localidades/provincias', [LocalidadController::class, 'provincias'])->name('localidades.provincias');
-           Route::get('/localidades/por-provincia', [LocalidadController::class, 'porProvincia'])->name('localidades.porProvincia');
-           Route::get('/localidades/buscar', [LocalidadController::class, 'buscar'])->name('localidades.buscar');
-           Route::get('/localidades/{id}', [LocalidadController::class, 'show'])->name('localidades.show');
-           Route::get('/localidades/por-codigo-postal', [LocalidadController::class, 'porCodigoPostal'])->name('localidades.porCodigoPostal');
+// Ruta temporal para probar DataTable sin autenticación
+Route::get('/test-clientes-data', [ClienteController::class, 'getData'])->name('test.clientes.data');
 
-// Incluir rutas de autenticación
-require __DIR__.'/auth - copia.php';
+// Rutas para provincias
+Route::get('/provincias', [ProvinciaController::class, 'index'])->name('provincias.index');
+Route::get('/provincias/buscar', [ProvinciaController::class, 'buscar'])->name('provincias.buscar');
+Route::get('/provincias/{id}', [ProvinciaController::class, 'show'])->name('provincias.show');
+Route::get('/provincias/por-codigo', [ProvinciaController::class, 'porCodigo'])->name('provincias.porCodigo');
+Route::get('/provincias/{id}/localidades', [ProvinciaController::class, 'conLocalidades'])->name('provincias.conLocalidades');
+
+// Rutas para localidades
+Route::get('/localidades/provincias', [LocalidadController::class, 'provincias'])->name('localidades.provincias');
+Route::get('/localidades/por-provincia', [LocalidadController::class, 'porProvincia'])->name('localidades.porProvincia');
+Route::get('/localidades/buscar', [LocalidadController::class, 'buscar'])->name('localidades.buscar');
+Route::get('/localidades/{id}', [LocalidadController::class, 'show'])->name('localidades.show');
+Route::get('/localidades/por-codigo-postal', [LocalidadController::class, 'porCodigoPostal'])->name('localidades.porCodigoPostal');
+
+// Rutas de autenticación personalizadas
+Route::middleware('guest')->group(function () {
+    Route::get('login', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'create'])
+        ->name('login');
+    Route::post('login', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'store']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('logout', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy'])
+        ->name('logout');
+    
+    Route::get('verify-email', [App\Http\Controllers\Auth\EmailVerificationPromptController::class, '__invoke'])
+        ->name('verification.notice');
+    Route::get('verify-email/{id}/{hash}', [App\Http\Controllers\Auth\VerifyEmailController::class, '__invoke'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+    Route::post('email/verification-notification', [App\Http\Controllers\Auth\EmailVerificationNotificationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
+    
+    Route::get('confirm-password', [App\Http\Controllers\Auth\ConfirmablePasswordController::class, 'show'])
+        ->name('password.confirm');
+    Route::post('confirm-password', [App\Http\Controllers\Auth\ConfirmablePasswordController::class, 'store']);
+    
+    Route::put('password', [App\Http\Controllers\Auth\PasswordController::class, 'update'])
+        ->name('password.update');
+});
+
+Route::middleware('guest')->group(function () {
+    Route::get('register', [App\Http\Controllers\Auth\RegisteredUserController::class, 'create'])
+        ->name('register');
+    Route::post('register', [App\Http\Controllers\Auth\RegisteredUserController::class, 'store']);
+    
+    Route::get('forgot-password', [App\Http\Controllers\Auth\PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
+    Route::post('forgot-password', [App\Http\Controllers\Auth\PasswordResetLinkController::class, 'store'])
+        ->name('password.email');
+    
+    Route::get('reset-password/{token}', [App\Http\Controllers\Auth\NewPasswordController::class, 'create'])
+        ->name('password.reset');
+    Route::post('reset-password', [App\Http\Controllers\Auth\NewPasswordController::class, 'store'])
+        ->name('password.store');
+});
+
+Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
