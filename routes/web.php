@@ -9,7 +9,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Nueva ruta personalizada prueba de webhook 21:55 alalalal
+// Nueva ruta personalizada prueba de webhook 2226 porfavor que ande
 Route::get('/bienvenido', function () {
     return view('bienvenido');
 });
