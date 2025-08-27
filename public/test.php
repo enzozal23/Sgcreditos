@@ -1,1 +1,1 @@
-<?php echo "PHP funciona correctamente!"; ?>
+<?php echo "PHP funciona correctamente prueba 7 final!"; ?>
