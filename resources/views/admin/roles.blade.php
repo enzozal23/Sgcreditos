@@ -4,7 +4,7 @@
     @php
         $breadcrumbs = [
             ['title' => 'Administración', 'url' => '#'],
-            ['title' => 'Roles', 'url' => route('admin.roles')]
+            ['title' => 'Roles', 'url' => route('admin.roles.index')]
         ];
     @endphp
     

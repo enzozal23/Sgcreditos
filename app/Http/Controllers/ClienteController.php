@@ -72,6 +72,12 @@ class ClienteController extends Controller
 
         try {
             $data = $request->all();
+            
+            // Asignar empresa_id del usuario autenticado
+            if (auth()->check() && auth()->user()->empresa_id) {
+                $data['empresa_id'] = auth()->user()->empresa_id;
+            }
+            
             \Log::info('Data to create: ' . json_encode($data));
             
             $cliente = Cliente::create($data);
@@ -107,6 +113,14 @@ class ClienteController extends Controller
      */
     public function show(Cliente $cliente)
     {
+        // Verificar que el cliente pertenece a la empresa del usuario
+        if (auth()->check() && auth()->user()->empresa_id && $cliente->empresa_id !== auth()->user()->empresa_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para ver este cliente.'
+            ], 403);
+        }
+        
         $cliente->load(['provincia', 'localidad']);
         $cliente->fecha_nacimiento_formateada = $cliente->fecha_nacimiento_formateada;
         
@@ -121,6 +135,14 @@ class ClienteController extends Controller
      */
     public function edit(Cliente $cliente)
     {
+        // Verificar que el cliente pertenece a la empresa del usuario
+        if (auth()->check() && auth()->user()->empresa_id && $cliente->empresa_id !== auth()->user()->empresa_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para editar este cliente.'
+            ], 403);
+        }
+        
         $cliente->load(['provincia', 'localidad']);
         $cliente->fecha_nacimiento_formateada = $cliente->fecha_nacimiento_formateada;
         
@@ -178,6 +200,14 @@ class ClienteController extends Controller
         }
 
         try {
+            // Verificar que el cliente pertenece a la empresa del usuario
+            if (auth()->check() && auth()->user()->empresa_id && $cliente->empresa_id !== auth()->user()->empresa_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para actualizar este cliente.'
+                ], 403);
+            }
+            
             $data = $request->all();
             \Log::info('Data to update: ' . json_encode($data));
             
@@ -213,6 +243,14 @@ class ClienteController extends Controller
     public function destroy(Cliente $cliente)
     {
         try {
+            // Verificar que el cliente pertenece a la empresa del usuario
+            if (auth()->check() && auth()->user()->empresa_id && $cliente->empresa_id !== auth()->user()->empresa_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para eliminar este cliente.'
+                ], 403);
+            }
+            
             $cliente->delete();
             
             return response()->json([
@@ -241,7 +279,7 @@ class ClienteController extends Controller
                 return response()->json(['error' => 'No autenticado'], 401);
             }
             
-            $clientes = Cliente::with(['provincia', 'localidad'])->orderBy('created_at', 'desc')->get();
+            $clientes = Cliente::deMiEmpresa()->with(['provincia', 'localidad'])->orderBy('created_at', 'desc')->get();
             \Log::info('Clientes found: ' . $clientes->count());
             
             $data = [];

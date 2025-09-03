@@ -11,7 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'verificar.empresa' => \App\Http\Middleware\VerificarEmpresa::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

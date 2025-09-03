@@ -4,10 +4,26 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Cliente extends Model
 {
     use HasFactory;
+
+    /**
+     * Boot del modelo
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($cliente) {
+            // Asignar empresa_id del usuario autenticado
+            if (auth()->check() && auth()->user()->empresa_id) {
+                $cliente->empresa_id = auth()->user()->empresa_id;
+            }
+        });
+    }
 
     protected $fillable = [
         'nombre',
@@ -21,7 +37,8 @@ class Cliente extends Model
         'codigo_postal',
         'fecha_nacimiento',
         'estado',
-        'observaciones'
+        'observaciones',
+        'empresa_id'
     ];
 
     protected $casts = [
@@ -79,5 +96,32 @@ class Cliente extends Model
               ->orWhere('dni', 'like', "%{$termino}%")
               ->orWhere('email', 'like', "%{$termino}%");
         });
+    }
+
+    /**
+     * Relación con Empresa
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    /**
+     * Scope para filtrar por empresa
+     */
+    public function scopePorEmpresa($query, $empresaId)
+    {
+        return $query->where('empresa_id', $empresaId);
+    }
+
+    /**
+     * Scope global para filtrar por empresa del usuario autenticado
+     */
+    public function scopeDeMiEmpresa($query)
+    {
+        if (auth()->check() && auth()->user()->empresa_id) {
+            return $query->where('empresa_id', auth()->user()->empresa_id);
+        }
+        return $query;
     }
 }

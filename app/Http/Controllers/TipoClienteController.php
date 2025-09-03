@@ -24,7 +24,7 @@ class TipoClienteController extends Controller
     public function data()
     {
         try {
-            $tipos = TipoCliente::select([
+            $tipos = TipoCliente::deMiEmpresa()->select([
                 'id',
                 'nombre',
                 'identificador',
@@ -95,6 +95,7 @@ class TipoClienteController extends Controller
                 'nombre' => $request->nombre,
                 'identificador' => $request->identificador,
                 'estado' => $request->estado
+                // empresa_id se asigna automáticamente en el modelo
             ]);
 
             // Crear la tabla base para este tipo de cliente

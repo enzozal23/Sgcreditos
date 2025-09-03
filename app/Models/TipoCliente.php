@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 
@@ -12,8 +13,24 @@ class TipoCliente extends Model
     protected $fillable = [
         'nombre',
         'identificador',
-        'estado'
+        'estado',
+        'empresa_id'
     ];
+
+    /**
+     * Boot del modelo
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($tipoCliente) {
+            // Asignar empresa_id del usuario autenticado
+            if (auth()->check() && auth()->user()->empresa_id) {
+                $tipoCliente->empresa_id = auth()->user()->empresa_id;
+            }
+        });
+    }
 
     protected $casts = [
         'created_at' => 'datetime',
@@ -73,5 +90,32 @@ class TipoCliente extends Model
     public function camposRequeridos(): HasMany
     {
         return $this->hasMany(CampoTipoCliente::class, 'tipo_cliente_id')->activos()->ordenado();
+    }
+
+    /**
+     * Relación con Empresa
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    /**
+     * Scope para filtrar por empresa del usuario autenticado
+     */
+    public function scopeDeMiEmpresa($query)
+    {
+        if (auth()->check() && auth()->user()->empresa_id) {
+            return $query->where('empresa_id', auth()->user()->empresa_id);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope para filtrar por empresa específica
+     */
+    public function scopePorEmpresa($query, $empresaId)
+    {
+        return $query->where('empresa_id', $empresaId);
     }
 }

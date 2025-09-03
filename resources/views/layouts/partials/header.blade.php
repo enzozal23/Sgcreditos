@@ -23,8 +23,8 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="{{ route('admin.monitoreo') }}"><i class="fas fa-chart-line me-2"></i>Monitoreo</a></li>
-                        <li><a class="dropdown-item" href="{{ route('admin.permisos') }}"><i class="fas fa-key me-2"></i>Permisos</a></li>
-                        <li><a class="dropdown-item" href="{{ route('admin.roles') }}"><i class="fas fa-users-cog me-2"></i>Roles</a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.permisos.index') }}"><i class="fas fa-key me-2"></i>Permisos</a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.roles.index') }}"><i class="fas fa-users-cog me-2"></i>Roles</a></li>
                         <li><a class="dropdown-item" href="{{ route('admin.usuarios') }}"><i class="fas fa-users me-2"></i>Usuarios</a></li>
                     </ul>
                 </li>

@@ -144,7 +144,7 @@
 
 	<div class="min-h-screen bg-gray-100">
 		<main class="container">
-			{{ $slot }}
+			@yield('content')
 		</main>
 	</div>
 

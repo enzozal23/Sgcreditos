@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
@@ -14,7 +15,8 @@ class TipoCredito extends Model
     
     protected $fillable = [
         'nombre',
-        'identificador'
+        'identificador',
+        'empresa_id'
     ];
 
     protected $casts = [
@@ -158,6 +160,33 @@ class TipoCredito extends Model
     }
     
     /**
+     * Relación con Empresa
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    /**
+     * Scope para filtrar por empresa del usuario autenticado
+     */
+    public function scopeDeMiEmpresa($query)
+    {
+        if (auth()->check() && auth()->user()->empresa_id) {
+            return $query->where('empresa_id', auth()->user()->empresa_id);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope para filtrar por empresa específica
+     */
+    public function scopePorEmpresa($query, $empresaId)
+    {
+        return $query->where('empresa_id', $empresaId);
+    }
+    
+    /**
      * Obtener información del cliente desde la tabla dinámica
      */
     public static function obtenerCliente($tipoClienteId, $clienteId)
@@ -180,6 +209,11 @@ class TipoCredito extends Model
         static::creating(function ($tipoCredito) {
             if (empty($tipoCredito->identificador)) {
                 $tipoCredito->identificador = self::generarIdentificador($tipoCredito->nombre);
+            }
+            
+            // Asignar empresa_id del usuario autenticado
+            if (auth()->check() && auth()->user()->empresa_id) {
+                $tipoCredito->empresa_id = auth()->user()->empresa_id;
             }
         });
         

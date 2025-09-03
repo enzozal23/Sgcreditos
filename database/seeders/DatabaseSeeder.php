@@ -20,11 +20,13 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
+            EmpresaSeeder::class, // Agregar el seeder de empresas primero
             VariablesSeeder::class,
             // ClienteSeeder::class, // Comentado por error de columna ciudad
             ProvinciaSeeder::class, // Agregar el seeder de provincias
             LocalidadSeeder::class, // Agregar el seeder de localidades
             TipoAmortizacionSeeder::class, // Agregar el seeder de tipos de amortización
+            RolePermissionSeeder::class, // Agregar el seeder de roles y permisos
         ]);
     }
 }

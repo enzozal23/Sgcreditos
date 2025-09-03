@@ -23,7 +23,7 @@ class TipoCreditoController extends Controller
      */
     public function getData(): JsonResponse
     {
-        $tiposCredito = TipoCredito::orderBy('created_at', 'desc')->get();
+        $tiposCredito = TipoCredito::deMiEmpresa()->orderBy('created_at', 'desc')->get();
         
         $data = $tiposCredito->map(function ($tipo) {
             return [
@@ -44,7 +44,7 @@ class TipoCreditoController extends Controller
      */
     public function getDataCreditos(): JsonResponse
     {
-        $tiposCredito = TipoCredito::orderBy('created_at', 'desc')->get();
+        $tiposCredito = TipoCredito::deMiEmpresa()->orderBy('created_at', 'desc')->get();
         
         $data = $tiposCredito->map(function ($tipo) {
             return [
@@ -87,6 +87,7 @@ class TipoCreditoController extends Controller
             $tipoCredito = TipoCredito::create([
                 'nombre' => $request->nombre,
                 'identificador' => $request->identificador
+                // empresa_id se asigna automáticamente en el modelo
             ]);
 
             return response()->json([

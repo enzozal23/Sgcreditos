@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\LocalidadController;
 use App\Http\Controllers\ProvinciaController;
+use App\Http\Controllers\EmpresaController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -37,13 +38,28 @@ Route::middleware('auth')->group(function () {
         return view('admin.monitoreo');
     })->name('admin.monitoreo');
 
-    Route::get('/admin/permisos', function () {
-        return view('admin.permisos');
-    })->name('admin.permisos');
+    // Route::get('/admin/permisos', function () {
+    //     return view('admin.permisos');
+    // })->name('admin.permisos');
 
-    Route::get('/admin/roles', function () {
-        return view('admin.roles');
-    })->name('admin.roles');
+    // Rutas de Roles
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('roles', [\App\Http\Controllers\Admin\RoleController::class, 'index'])->name('roles.index');
+        Route::get('roles/create', [\App\Http\Controllers\Admin\RoleController::class, 'create'])->name('roles.create');
+        Route::post('roles', [\App\Http\Controllers\Admin\RoleController::class, 'store'])->name('roles.store');
+        Route::get('roles/{role}', [\App\Http\Controllers\Admin\RoleController::class, 'show'])->name('roles.show');
+        Route::get('roles/{role}/edit', [\App\Http\Controllers\Admin\RoleController::class, 'edit'])->name('roles.edit');
+        Route::put('roles/{role}', [\App\Http\Controllers\Admin\RoleController::class, 'update'])->name('roles.update');
+        Route::delete('roles/{role}', [\App\Http\Controllers\Admin\RoleController::class, 'destroy'])->name('roles.destroy');
+        Route::get('roles/{role}/permissions', [\App\Http\Controllers\Admin\RoleController::class, 'permissions'])->name('roles.permissions');
+        Route::put('roles/{role}/permissions', [\App\Http\Controllers\Admin\RoleController::class, 'updatePermissions'])->name('roles.permissions.update');
+        Route::patch('roles/{role}/toggle-estado', [\App\Http\Controllers\Admin\RoleController::class, 'toggleEstado'])->name('roles.toggle-estado');
+        
+        // Rutas de Permisos
+        Route::resource('permisos', \App\Http\Controllers\Admin\PermissionController::class);
+        Route::get('permisos/{permission}/roles', [\App\Http\Controllers\Admin\PermissionController::class, 'roles'])->name('permisos.roles');
+        Route::put('permisos/{permission}/roles', [\App\Http\Controllers\Admin\PermissionController::class, 'updateRoles'])->name('permisos.roles.update');
+    });
 
     Route::get('/admin/usuarios', function () {
         return view('admin.usuarios');
@@ -140,6 +156,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/tipos-clientes/{tipo_id}/campos/{campo_id}/edit', [App\Http\Controllers\TipoClienteController::class, 'camposEdit'])->name('tipos.clientes.campos.edit');
     Route::put('/tipos-clientes/{tipo_id}/campos/{campo_id}', [App\Http\Controllers\TipoClienteController::class, 'camposUpdate'])->name('tipos.clientes.campos.update');
     Route::delete('/tipos-clientes/{tipo_id}/campos/{campo_id}', [App\Http\Controllers\TipoClienteController::class, 'camposDestroy'])->name('tipos.clientes.campos.destroy');
+    
+    // Rutas para empresas
+    Route::resource('empresas', EmpresaController::class);
+    Route::patch('/empresas/{empresa}/toggle-estado', [EmpresaController::class, 'toggleEstado'])->name('empresas.toggle-estado');
 });
 
 // Ruta de prueba para DataTable
@@ -208,4 +228,4 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+// Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
