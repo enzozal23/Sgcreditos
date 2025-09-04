@@ -45,12 +45,14 @@ class TipoCredito extends Model
                 $table->unsignedBigInteger('cliente_id');
                 $table->unsignedBigInteger('tipo_cliente_id');
                 $table->unsignedBigInteger('amortizacion_id')->nullable();
+                $table->enum('estado', ['pendiente', 'aprobado', 'rechazado'])->default('pendiente');
                 $table->timestamps();
                 
                 // Índices básicos
                 $table->index('cliente_id');
                 $table->index('tipo_cliente_id');
                 $table->index('amortizacion_id');
+                $table->index('estado');
                 
                 // Foreign keys
                 $table->foreign('tipo_cliente_id')->references('id')->on('tipo_clientes')->onDelete('cascade');
@@ -78,6 +80,12 @@ class TipoCredito extends Model
                     $table->foreign('amortizacion_id')->references('id')->on('tipos_amortizacion')->onDelete('set null');
                 }
                 
+                // Agregar columna estado si no existe
+                if (!Schema::hasColumn($this->tabla_credito, 'estado')) {
+                    $table->enum('estado', ['pendiente', 'aprobado', 'rechazado'])->default('pendiente')->after('amortizacion_id');
+                    $table->index('estado');
+                }
+                
                 foreach ($campos as $campo) {
                     $nombreColumna = $campo->nombre_campo;
                     
@@ -98,6 +106,9 @@ class TipoCredito extends Model
                                 break;
                             case 'cuota':
                                 $table->boolean($nombreColumna)->default(0);
+                                break;
+                            case 'archivo':
+                                $table->string($nombreColumna, 500)->nullable(); // Ruta del archivo
                                 break;
                             default:
                                 $table->string($nombreColumna, 255)->nullable();

@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Campos del Tipo de Crédito</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -103,6 +104,7 @@
                                          <option value="fecha">Fecha</option>
                                          <option value="selector">Selector</option>
                                          <option value="cuota">Cuota</option>
+                                         <option value="archivo">Archivo</option>
                                      </select>
                                      <div class="invalid-feedback" id="tipo_campo-error"></div>
                                  </div>
@@ -422,7 +424,7 @@
                $('#tipo_campo').on('change', function() {
                    const tipoSeleccionado = $(this).val();
                    
-                                       // Ocultar todos los contenedores específicos
+                   // Ocultar todos los contenedores específicos
                     $('#opciones-container').hide();
                     $('#cuota-config-container').hide();
                     $('#monto-transaccional-container').hide();
@@ -433,13 +435,14 @@
                        $('#opciones-container').show();
                    } else if (tipoSeleccionado === 'cuota') {
                        $('#cuota-config-container').show();
-                                       } else if (tipoSeleccionado === 'numero') {
+                   } else if (tipoSeleccionado === 'numero') {
                         $('#monto-transaccional-container').show();
                         verificarMontoTransaccionalExistente();
-                    } else if (tipoSeleccionado === 'fecha') {
+                   } else if (tipoSeleccionado === 'fecha') {
                        $('#fecha-ejecucion-container').show();
                        verificarFechaEjecucionExistente();
                    }
+                   // Para tipo 'archivo' no se muestra ningún contenedor adicional
                });
 
                                // Evento para validar fecha de ejecución en modo edición
@@ -659,4 +662,4 @@
         });
     </script>
     @endpush
-</x-app-layout>
+@endsection

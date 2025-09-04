@@ -21,7 +21,7 @@ return new class extends Migration
             // Campos de configuración
             $table->string('nombre_campo', 100); // Nombre de la columna en la base de datos
             $table->string('alias', 100); // Nombre que se muestra al usuario
-            $table->enum('tipo_campo', ['texto', 'numero', 'fecha', 'selector', 'cuota']); // Tipo de campo
+            $table->enum('tipo_campo', ['texto', 'numero', 'fecha', 'selector', 'cuota', 'archivo']); // Tipo de campo
             $table->boolean('requerido')->default(false); // Si el campo es requerido
             $table->boolean('es_unico')->default(false); // Si el campo debe ser único
             $table->integer('orden')->default(1); // Orden de aparición

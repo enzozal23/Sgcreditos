@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Clientes - {{ $tipoCliente->nombre }}</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -437,10 +438,27 @@
                      console.error('Error en saveCliente:', error);
                      console.error('Status:', status);
                      console.error('Response:', xhr.responseText);
-                     showError('Error', 'Error al guardar el cliente');
+                     
+                     // Intentar obtener el mensaje de error del backend
+                     let errorMessage = 'Error al guardar el cliente';
+                     
+                     if (xhr.responseJSON && xhr.responseJSON.message) {
+                         errorMessage = xhr.responseJSON.message;
+                     } else if (xhr.responseText) {
+                         try {
+                             const response = JSON.parse(xhr.responseText);
+                             if (response.message) {
+                                 errorMessage = response.message;
+                             }
+                         } catch (e) {
+                             console.error('Error parsing response:', e);
+                         }
+                     }
+                     
+                     showError('Error', errorMessage);
                  }
              });
          }
     </script>
     @endpush
-</x-app-layout>
+@endsection

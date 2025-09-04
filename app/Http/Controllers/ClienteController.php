@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
+use App\Models\Telefono;
+use App\Models\Correo;
+use App\Models\Direccion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class ClienteController extends Controller
 {
@@ -31,6 +35,7 @@ class ClienteController extends Controller
     {
         // DEBUG: Log de todos los datos recibidos
         \Log::info('=== STORE CLIENTE DEBUG ===');
+        \Log::info('Método store ejecutándose...');
         \Log::info('All request data: ' . json_encode($request->all()));
         \Log::info('codigo_localidad from request: ' . $request->input('codigo_localidad'));
         \Log::info('provincia_id from request: ' . $request->input('provincia_id'));
@@ -71,6 +76,8 @@ class ClienteController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+            
             $data = $request->all();
             
             // Asignar empresa_id del usuario autenticado
@@ -81,6 +88,44 @@ class ClienteController extends Controller
             \Log::info('Data to create: ' . json_encode($data));
             
             $cliente = Cliente::create($data);
+            
+            // Guardar teléfono en tabla telefonos (siempre se crea porque es requerido)
+            \Log::info('Creando teléfono para cliente ID: ' . $cliente->id . ' - Número: ' . $request->telefono);
+            $telefono = Telefono::create([
+                'cliente_id' => $cliente->id,
+                'numero' => $request->telefono,
+                'tipo' => 'celular',
+                'es_principal' => true,
+                'observaciones' => 'Teléfono principal del cliente'
+            ]);
+            \Log::info('Teléfono creado con ID: ' . $telefono->id);
+            
+            // Guardar correo en tabla correos (siempre se crea porque es requerido)
+            \Log::info('Creando correo para cliente ID: ' . $cliente->id . ' - Email: ' . $request->email);
+            $correo = Correo::create([
+                'cliente_id' => $cliente->id,
+                'email' => $request->email,
+                'tipo' => 'personal',
+                'es_principal' => true,
+                'verificado' => false,
+                'observaciones' => 'Correo principal del cliente'
+            ]);
+            \Log::info('Correo creado con ID: ' . $correo->id);
+            
+            // Guardar dirección en tabla direcciones
+            if ($request->filled('direccion')) {
+                Direccion::create([
+                    'cliente_id' => $cliente->id,
+                    'tipo' => 'casa',
+                    'calle' => $request->direccion,
+                    'ciudad' => 'Ciudad', // Por defecto, se puede mejorar
+                    'pais' => 'Argentina',
+                    'es_principal' => true,
+                    'observaciones' => 'Dirección principal del cliente'
+                ]);
+            }
+            
+            DB::commit();
             
             // Registrar en el log
             LogRegistrar("Creó cliente: {$cliente->nombre} {$cliente->apellido} (DNI: {$cliente->dni})");
@@ -100,6 +145,7 @@ class ClienteController extends Controller
                 'cliente' => $cliente
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             \Log::error('Error creating cliente: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString());
             return response()->json([
                 'success' => false,
@@ -402,8 +448,14 @@ class ClienteController extends Controller
     public function clientesPorTipoStore(Request $request, $tipoClienteId)
     {
         try {
+            \Log::info('=== CLIENTES POR TIPO STORE DEBUG ===');
+            \Log::info('Tipo Cliente ID: ' . $tipoClienteId);
+            \Log::info('All request data: ' . json_encode($request->all()));
+            
             $tipoCliente = \App\Models\TipoCliente::findOrFail($tipoClienteId);
             $tablaNombre = $tipoCliente->tabla_base;
+            
+            \Log::info('Tabla nombre: ' . $tablaNombre);
             
             // Verificar si la tabla existe
             if (!\Schema::hasTable($tablaNombre)) {
@@ -418,33 +470,112 @@ class ClienteController extends Controller
                 ->orderBy('orden')
                 ->get();
             
-            // Validar campos requeridos
+            \Log::info('Campos encontrados: ' . $campos->count());
+            
+            // Validar solo los campos dinámicos que son requeridos
             $reglas = [];
             foreach ($campos as $campo) {
                 if ($campo->requerido) {
                     $reglas[$campo->nombre_campo] = 'required';
                 }
             }
-            $reglas['cliente_id'] = 'required|integer';
+            
+            // Los campos telefono, correo y direccion son requeridos por defecto
+            $reglas['telefono'] = 'required|string|max:20';
+            $reglas['correo'] = 'required|email|max:255';
+            $reglas['direccion'] = 'nullable|string|max:255';
             
             $request->validate($reglas);
             
-            // Preparar datos para inserción
-            $datos = ['cliente_id' => $request->cliente_id];
+            \Log::info('Validación exitosa, procediendo a crear cliente...');
+            
+            DB::beginTransaction();
+            
+            // Preparar datos para inserción en tabla dinámica
+            $datos = [];
             foreach ($campos as $campo) {
                 $datos[$campo->nombre_campo] = $request->input($campo->nombre_campo);
             }
             
-            // Insertar en la tabla dinámica
+            \Log::info('Datos para tabla dinámica: ' . json_encode($datos));
+            
+            // Insertar en la tabla dinámica PRIMERO para obtener el ID
             $id = \DB::table($tablaNombre)->insertGetId($datos);
+            
+            \Log::info('Registro insertado en tabla dinámica con ID: ' . $id);
+            
+            // Usar el ID de la tabla dinámica para las tablas relacionadas
+            $clienteId = $id;
+            
+            // Guardar teléfono en tabla telefonos
+            \Log::info('Creando teléfono para cliente ID: ' . $clienteId . ' - Número: ' . $request->telefono);
+            $telefono = Telefono::create([
+                'cliente_id' => $clienteId,
+                'numero' => $request->telefono,
+                'tipo' => 'celular',
+                'es_principal' => true,
+                'observaciones' => 'Teléfono principal del cliente'
+            ]);
+            \Log::info('Teléfono creado con ID: ' . $telefono->id);
+            
+            // Guardar correo en tabla correos
+            \Log::info('Creando correo para cliente ID: ' . $clienteId . ' - Email: ' . $request->correo);
+            $correo = Correo::create([
+                'cliente_id' => $clienteId,
+                'email' => $request->correo,
+                'tipo' => 'personal',
+                'es_principal' => true,
+                'verificado' => false,
+                'observaciones' => 'Correo principal del cliente'
+            ]);
+            \Log::info('Correo creado con ID: ' . $correo->id);
+            
+            // Guardar dirección en tabla direcciones (si está presente)
+            if ($request->filled('direccion')) {
+                \Log::info('Creando dirección para cliente ID: ' . $clienteId);
+                $direccion = Direccion::create([
+                    'cliente_id' => $clienteId,
+                    'tipo' => 'casa',
+                    'calle' => $request->direccion,
+                    'ciudad' => 'Ciudad', // Por defecto
+                    'pais' => 'Argentina',
+                    'es_principal' => true,
+                    'observaciones' => 'Dirección principal del cliente'
+                ]);
+                \Log::info('Dirección creada con ID: ' . $direccion->id);
+            }
+            
+
+            
+            DB::commit();
             
             return response()->json([
                 'success' => true,
                 'message' => 'Cliente creado exitosamente',
-                'id' => $id
+                'cliente_id' => $clienteId,
+                'tabla_dinamica_id' => $id
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error en clientesPorTipoStore: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Error en clientesPorTipoStore: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString());
+            
+            // Manejar errores específicos de base de datos
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                if (strpos($e->getMessage(), 'clientes_dni_unique') !== false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ya existe un cliente con esos datos. No se pueden crear clientes duplicados.',
+                        'error_type' => 'duplicate_dni'
+                    ], 422);
+                } elseif (strpos($e->getMessage(), 'clientes_email_unique') !== false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ya existe un cliente con ese correo electrónico. No se pueden crear clientes duplicados.',
+                        'error_type' => 'duplicate_email'
+                    ], 422);
+                }
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Error al crear el cliente: ' . $e->getMessage()
@@ -566,14 +697,13 @@ class ClienteController extends Controller
                     $reglas[$campo->nombre_campo] = 'required';
                 }
             }
-            $reglas['cliente_id'] = 'required|integer';
             
             \Log::info("Reglas de validación:", $reglas);
             
             $request->validate($reglas);
             
-            // Preparar datos para actualización
-            $datos = ['cliente_id' => $request->cliente_id];
+            // Preparar datos para actualización (sin cliente_id ya que no existe en la tabla dinámica)
+            $datos = [];
             foreach ($campos as $campo) {
                 $valor = $request->input($campo->nombre_campo);
                 $datos[$campo->nombre_campo] = $valor;
@@ -742,6 +872,148 @@ class ClienteController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al buscar clientes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Guardar información de contacto del cliente
+     */
+    public function guardarContacto(Request $request)
+    {
+        try {
+            \Log::info('=== GUARDAR CONTACTO DEBUG ===');
+            \Log::info('Cliente ID: ' . $request->input('cliente_id'));
+            \Log::info('Teléfonos: ' . json_encode($request->input('telefonos')));
+            \Log::info('Correos: ' . json_encode($request->input('correos')));
+            \Log::info('Direcciones: ' . json_encode($request->input('direcciones')));
+            
+            $clienteId = $request->input('cliente_id');
+            $telefonos = $request->input('telefonos', []);
+            $correos = $request->input('correos', []);
+            $direcciones = $request->input('direcciones', []);
+            
+            if (!$clienteId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'ID de cliente es requerido'
+                ], 400);
+            }
+            
+            DB::beginTransaction();
+            
+            // Guardar teléfonos
+            foreach ($telefonos as $telefonoData) {
+                if (!empty($telefonoData['numero'])) {
+                    Telefono::create([
+                        'cliente_id' => $clienteId,
+                        'numero' => $telefonoData['numero'],
+                        'tipo' => $telefonoData['tipo'] ?? 'celular',
+                        'es_principal' => $telefonoData['es_principal'] ?? false,
+                        'observaciones' => 'Teléfono agregado desde módulo de contacto'
+                    ]);
+                }
+            }
+            
+            // Guardar correos
+            foreach ($correos as $correoData) {
+                if (!empty($correoData['email'])) {
+                    Correo::create([
+                        'cliente_id' => $clienteId,
+                        'email' => $correoData['email'],
+                        'tipo' => $correoData['tipo'] ?? 'personal',
+                        'es_principal' => $correoData['es_principal'] ?? false,
+                        'verificado' => false,
+                        'observaciones' => 'Correo agregado desde módulo de contacto'
+                    ]);
+                }
+            }
+            
+            // Guardar direcciones
+            foreach ($direcciones as $direccionData) {
+                if (!empty($direccionData['calle']) || !empty($direccionData['numero'])) {
+                    Direccion::create([
+                        'cliente_id' => $clienteId,
+                        'tipo' => $direccionData['tipo'] ?? 'domicilio',
+                        'calle' => $direccionData['calle'] ?? '',
+                        'numero' => $direccionData['numero'] ?? '',
+                        'piso' => $direccionData['piso'] ?? '',
+                        'departamento' => '',
+                        'codigo_postal' => $direccionData['codigo_postal'] ?? '',
+                        'ciudad' => $direccionData['ciudad'] ?? '',
+                        'provincia' => $direccionData['provincia'] ?? '',
+                        'pais' => 'Argentina',
+                        'es_principal' => $direccionData['es_principal'] ?? false,
+                        'observaciones' => 'Dirección agregada desde módulo de contacto'
+                    ]);
+                }
+            }
+            
+            DB::commit();
+            
+            \Log::info('Información de contacto guardada exitosamente');
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Información de contacto guardada correctamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error al guardar información de contacto: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al guardar la información de contacto: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obtener información de contacto del cliente
+     */
+    public function obtenerContactos(Request $request)
+    {
+        try {
+            $clienteId = $request->input('cliente_id');
+            
+            if (!$clienteId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'ID de cliente es requerido'
+                ], 400);
+            }
+            
+            \Log::info('Obteniendo contactos para cliente ID: ' . $clienteId);
+            
+            // Obtener teléfonos
+            $telefonos = Telefono::where('cliente_id', $clienteId)->get();
+            
+            // Obtener correos
+            $correos = Correo::where('cliente_id', $clienteId)->get();
+            
+            // Obtener direcciones
+            $direcciones = Direccion::where('cliente_id', $clienteId)->get();
+            
+            \Log::info('Contactos encontrados:', [
+                'telefonos' => $telefonos->count(),
+                'correos' => $correos->count(),
+                'direcciones' => $direcciones->count()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'telefonos' => $telefonos,
+                    'correos' => $correos,
+                    'direcciones' => $direcciones
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error al obtener contactos: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener la información de contacto: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -124,4 +124,52 @@ class Cliente extends Model
         }
         return $query;
     }
+
+    /**
+     * Relación con Telefonos (uno a muchos)
+     */
+    public function telefonos()
+    {
+        return $this->hasMany(Telefono::class);
+    }
+
+    /**
+     * Relación con Correos (uno a muchos)
+     */
+    public function correos()
+    {
+        return $this->hasMany(Correo::class);
+    }
+
+    /**
+     * Relación con Direcciones (uno a muchos)
+     */
+    public function direcciones()
+    {
+        return $this->hasMany(Direccion::class);
+    }
+
+    /**
+     * Obtener teléfono principal
+     */
+    public function telefonoPrincipal()
+    {
+        return $this->hasOne(Telefono::class)->where('es_principal', true);
+    }
+
+    /**
+     * Obtener correo principal
+     */
+    public function correoPrincipal()
+    {
+        return $this->hasOne(Correo::class)->where('es_principal', true);
+    }
+
+    /**
+     * Obtener dirección principal
+     */
+    public function direccionPrincipal()
+    {
+        return $this->hasOne(Direccion::class)->where('es_principal', true);
+    }
 }

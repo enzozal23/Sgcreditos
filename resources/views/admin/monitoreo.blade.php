@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Monitoreo</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -124,4 +125,4 @@
         }
     </script>
     @endpush
-</x-app-layout>
+@endsection

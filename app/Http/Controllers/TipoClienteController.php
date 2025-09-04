@@ -546,7 +546,14 @@ class TipoClienteController extends Controller
             
             $tablaNombre = $tipoCliente->tabla_base;
             $tipoColumna = $this->mapearTipoCampoAColumna($tipoCampo);
-            $nullable = $requerido ? 'NOT NULL' : 'NULL';
+            
+            // Para campos de fecha, siempre usar NULL para evitar problemas con datos existentes
+            if ($tipoCampo === 'fecha') {
+                $nullable = 'NULL';
+            } else {
+                $nullable = $requerido ? 'NOT NULL' : 'NULL';
+            }
+            
             $unique = $esUnico ? 'UNIQUE' : '';
             
             $sql = "ALTER TABLE {$tablaNombre} ADD COLUMN {$nombreCampo} {$tipoColumna} {$nullable}";
@@ -632,7 +639,7 @@ class TipoClienteController extends Controller
             case 'numero':
                 return 'DECIMAL(15,2)';
             case 'fecha':
-                return 'DATE';
+                return 'DATE NULL'; // Siempre nullable para evitar problemas con datos existentes
             case 'selector':
                 return 'VARCHAR(100)';
             default:

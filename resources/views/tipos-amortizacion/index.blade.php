@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Tipos de Amortización</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -311,4 +312,4 @@
         });
     </script>
     @endpush
-</x-app-layout>
+@endsection

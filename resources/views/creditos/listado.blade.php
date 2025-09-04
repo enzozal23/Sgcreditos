@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Listado de Créditos - {{ $tipoCredito->nombre }}</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -101,6 +102,22 @@
         let table;
         let tipoCreditoId = {{ $tipoCredito->id }};
         
+        // Función para obtener el icono según el tipo de archivo
+        function obtenerIconoArchivo(extension) {
+            const iconos = {
+                'PDF': '<i class="fas fa-file-pdf text-danger" title="PDF"></i>',
+                'DOC': '<i class="fas fa-file-word text-primary" title="Word"></i>',
+                'DOCX': '<i class="fas fa-file-word text-primary" title="Word"></i>',
+                'JPG': '<i class="fas fa-file-image text-success" title="Imagen"></i>',
+                'JPEG': '<i class="fas fa-file-image text-success" title="Imagen"></i>',
+                'PNG': '<i class="fas fa-file-image text-success" title="Imagen"></i>',
+                'XLS': '<i class="fas fa-file-excel text-success" title="Excel"></i>',
+                'XLSX': '<i class="fas fa-file-excel text-success" title="Excel"></i>'
+            };
+            
+            return iconos[extension] || '<i class="fas fa-file text-muted" title="Archivo"></i>';
+        }
+        
         $(document).ready(function() {
             // Ajustar columnas cuando cambie el tamaño de la ventana
             $(window).on('resize', function() {
@@ -109,63 +126,107 @@
                 }
             });
             
-            // Obtener datos primero para configurar columnas
+            // Obtener campos del tipo de crédito primero para saber los tipos
             $.ajax({
-                url: '/tipos-creditos/' + tipoCreditoId + '/creditos/data',
+                url: '/tipos-creditos/' + tipoCreditoId + '/campos/data',
                 type: 'GET',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
-                success: function(response) {
-                    if (response.data && response.data.length > 0) {
-                        // Configurar columnas dinámicamente
-                        const primerRegistro = response.data[0];
-                        const columnas = [];
-                        
-                        // Crear columnas para cada campo
-                        for (const [key, value] of Object.entries(primerRegistro)) {
-                            if (key !== 'acciones') {
-                                // Ocultar columnas de ID y timestamps
-                                if (key === 'cliente_id' || key === 'tipo_cliente_id' || key === 'amortizacion_id' || 
-                                    key === 'id' || key === 'created_at' || key === 'updated_at') {
-                                    continue;
-                                }
+                success: function(camposResponse) {
+                    const campos = camposResponse.data || [];
+                    const camposPorNombre = {};
+                    
+                    // Crear un mapa de campos por nombre para acceso rápido
+                    campos.forEach(campo => {
+                        camposPorNombre[campo.nombre_campo] = campo;
+                    });
+                    
+                    // Ahora obtener los datos de créditos
+                    $.ajax({
+                        url: '/tipos-creditos/' + tipoCreditoId + '/creditos/data',
+                        type: 'GET',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function(response) {
+                            if (response.data && response.data.length > 0) {
+                                // Configurar columnas dinámicamente
+                                const primerRegistro = response.data[0];
+                                const columnas = [];
                                 
-                                // Usar nombres en lugar de IDs
-                                let columnKey = key;
-                                let columnTitle = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
-                                
-                                if (key === 'cliente_nombre') {
-                                    columnTitle = 'Cliente';
-                                } else if (key === 'tipo_cliente_nombre') {
-                                    columnTitle = 'Tipo de Cliente';
-                                } else if (key === 'amortizacion_nombre') {
-                                    columnTitle = 'Tipo de Amortización';
-                                }
-                                
-                                // Verificar si es un campo de tipo cuota (valor 0 o 1)
-                                const esCampoCuota = typeof value === 'number' && (value === 0 || value === 1);
-                                
-                                if (esCampoCuota) {
-                                    // Para campos de cuota, mostrar check o X
-                                    columnas.push({ 
-                                        data: columnKey, 
-                                        title: columnTitle,
-                                        render: function(data) {
-                                            return data == 1 ? 
-                                                '<span class="text-success"><i class="fas fa-check-circle"></i> ✓</span>' : 
-                                                '<span class="text-muted"><i class="fas fa-times-circle"></i> ✗</span>';
+                                // Crear columnas para cada campo
+                                for (const [key, value] of Object.entries(primerRegistro)) {
+                                    if (key !== 'acciones') {
+                                        // Ocultar columnas de ID y timestamps
+                                        if (key === 'cliente_id' || key === 'tipo_cliente_id' || key === 'amortizacion_id' || 
+                                            key === 'id' || key === 'created_at' || key === 'updated_at') {
+                                            continue;
                                         }
-                                    });
-                                } else {
-                                    // Para otros campos, mostrar normalmente
-                                    columnas.push({ 
-                                        data: columnKey, 
-                                        title: columnTitle
-                                    });
+                                        
+                                        // Usar nombres en lugar de IDs
+                                        let columnKey = key;
+                                        let columnTitle = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                                        
+                                        if (key === 'cliente_nombre') {
+                                            columnTitle = 'Cliente';
+                                        } else if (key === 'tipo_cliente_nombre') {
+                                            columnTitle = 'Tipo de Cliente';
+                                        } else if (key === 'amortizacion_nombre') {
+                                            columnTitle = 'Tipo de Amortización';
+                                        }
+                                        
+                                        // Verificar si es un campo de tipo cuota (valor 0 o 1)
+                                        const esCampoCuota = typeof value === 'number' && (value === 0 || value === 1);
+                                        
+                                        // Verificar si es un campo de tipo archivo
+                                        const campoInfo = camposPorNombre[key];
+                                        const esCampoArchivo = campoInfo && campoInfo.tipo_campo === 'archivo';
+                                        
+                                        if (esCampoCuota) {
+                                            // Para campos de cuota, mostrar check o X
+                                            columnas.push({ 
+                                                data: columnKey, 
+                                                title: columnTitle,
+                                                render: function(data) {
+                                                    return data == 1 ? 
+                                                        '<span class="text-success"><i class="fas fa-check-circle"></i> ✓</span>' : 
+                                                        '<span class="text-muted"><i class="fas fa-times-circle"></i> ✗</span>';
+                                                }
+                                            });
+                                        } else if (esCampoArchivo) {
+                                            // Para campos de archivo, mostrar enlace de descarga
+                                            columnas.push({ 
+                                                data: columnKey, 
+                                                title: columnTitle,
+                                                render: function(data, type, row) {
+                                                    if (data && data !== 'null' && data !== '') {
+                                                        // Extraer nombre del archivo de la ruta
+                                                        const nombreArchivo = data.split('/').pop();
+                                                        const extension = nombreArchivo.split('.').pop().toUpperCase();
+                                                        const icono = obtenerIconoArchivo(extension);
+                                                        
+                                                        return `<div class="d-flex align-items-center">
+                                                            <span class="me-2">${icono}</span>
+                                                            <a href="/storage/${data}" target="_blank" class="btn btn-sm btn-outline-primary" title="Descargar: ${nombreArchivo}">
+                                                                <i class="fas fa-download me-1"></i>Descargar
+                                                            </a>
+                                                            <small class="text-muted ms-2">${extension}</small>
+                                                        </div>`;
+                                                    } else {
+                                                        return '<span class="text-muted">Sin archivo</span>';
+                                                    }
+                                                }
+                                            });
+                                        } else {
+                                            // Para otros campos, mostrar normalmente
+                                            columnas.push({ 
+                                                data: columnKey, 
+                                                title: columnTitle
+                                            });
+                                        }
+                                    }
                                 }
-                            }
-                        }
                         
                         // Agregar columna de acciones
                         columnas.push({ 
@@ -194,6 +255,11 @@
                     $('#creditos-table').html('<tr><td colspan="3" class="text-center">Error al cargar los datos</td></tr>');
                 }
             });
+                        },
+                        error: function() {
+                            $('#creditos-table').html('<tr><td colspan="3" class="text-center">Error al cargar los campos</td></tr>');
+                        }
+                    });
         });
         
         function inicializarDataTable(columnas) {
@@ -550,4 +616,4 @@
             background: #a8a8a8;
         }
     </style>
-</x-app-layout>
+@endsection

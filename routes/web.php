@@ -62,8 +62,13 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('/admin/usuarios', function () {
-        return view('admin.usuarios');
-    })->name('admin.usuarios');
+    return view('admin.usuarios');
+})->name('admin.usuarios');
+
+// Ruta de prueba para diagnosticar
+Route::get('/test', function () {
+    return view('test');
+})->name('test');
 });
 
 // Rutas de Clientes
@@ -71,6 +76,8 @@ Route::middleware('auth')->group(function () {
     // Ruta para obtener datos de DataTable (DEBE IR ANTES del resource)
     Route::get('/clientes/data', [ClienteController::class, 'getData'])->name('clientes.data');
     Route::get('/clientes/buscar', [ClienteController::class, 'buscar'])->name('clientes.buscar');
+    Route::get('/clientes/obtener-contactos', [ClienteController::class, 'obtenerContactos'])->name('clientes.obtener.contactos');
+    Route::post('/clientes/guardar-contacto', [ClienteController::class, 'guardarContacto'])->name('clientes.guardar.contacto');
     
     // Rutas para CRUD de clientes por tipo
     Route::get('/clientes/tipo/{tipoClienteId}', [ClienteController::class, 'clientesPorTipo'])->name('clientes.por.tipo');

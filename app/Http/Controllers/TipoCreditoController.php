@@ -305,7 +305,7 @@ class TipoCreditoController extends Controller
         $validator = Validator::make($request->all(), [
             'nombre_campo' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
             'alias' => 'required|string|max:100',
-            'tipo_campo' => 'required|in:texto,numero,fecha,selector,cuota',
+            'tipo_campo' => 'required|in:texto,numero,fecha,selector,cuota,archivo',
             'requerido' => 'boolean',
             'orden' => 'integer|min:1',
             'valor_por_defecto' => 'nullable|string|max:255',
@@ -558,7 +558,7 @@ class TipoCreditoController extends Controller
         $validator = Validator::make($request->all(), [
             'nombre_campo' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
             'alias' => 'required|string|max:100',
-            'tipo_campo' => 'required|in:texto,numero,fecha,selector,cuota',
+            'tipo_campo' => 'required|in:texto,numero,fecha,selector,cuota,archivo',
             'requerido' => 'boolean',
             'monto_transaccional' => 'boolean',
             'orden' => 'integer|min:1',
@@ -975,6 +975,9 @@ class TipoCreditoController extends Controller
     {
         $tipoCredito = TipoCredito::findOrFail($id);
         
+        // Verificar si es una simulación
+        $esSimulacion = $request->input('simulacion') === 'true';
+        
         try {
             // Validar que se haya proporcionado un cliente_id
             if (!$request->input('cliente_id')) {
@@ -1056,6 +1059,7 @@ class TipoCreditoController extends Controller
                 'cliente_id' => $request->input('cliente_id'),
                 'tipo_cliente_id' => $tipoClienteId, // Agregar referencia al tipo de cliente
                 'amortizacion_id' => $request->input('tipo_amortizacion_id'), // Agregar referencia al tipo de amortización
+                'estado' => $request->input('estado', 'pendiente'), // Estado del crédito (por defecto pendiente)
                 'created_at' => now(),
                 'updated_at' => now()
             ];
@@ -1083,22 +1087,95 @@ class TipoCreditoController extends Controller
                     }
                 } else {
                     // Para campos que no son cuota
-                    $valorCampo = $request->input('campo_' . $campo->nombre_campo);
-                    
-                    // Validar campos requeridos
-                    if ($campo->requerido && empty($valorCampo)) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'El campo "' . $campo->alias . '" es obligatorio'
-                        ], 422);
+                    if ($campo->tipo_campo === 'archivo') {
+                        // Procesar archivo
+                        $archivo = $request->file('campo_' . $campo->nombre_campo);
+                        
+                        // Validar campos requeridos
+                        if ($campo->requerido && !$archivo) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'El campo "' . $campo->alias . '" es obligatorio'
+                            ], 422);
+                        }
+                        
+                        if ($archivo) {
+                            // Validar tipo de archivo
+                            $extensionesPermitidas = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'];
+                            $extension = $archivo->getClientOriginalExtension();
+                            
+                            if (!in_array(strtolower($extension), $extensionesPermitidas)) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'El archivo "' . $campo->alias . '" debe ser: ' . implode(', ', $extensionesPermitidas)
+                                ], 422);
+                            }
+                            
+                            // Validar tamaño (máximo 10MB)
+                            if ($archivo->getSize() > 10 * 1024 * 1024) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'El archivo "' . $campo->alias . '" no puede superar los 10MB'
+                                ], 422);
+                            }
+                            
+                            // Generar nombre único para el archivo
+                            $nombreArchivo = time() . '_' . $campo->nombre_campo . '_' . $clienteId . '.' . $extension;
+                            
+                            // Guardar archivo en storage/app/public/creditos
+                            $rutaArchivo = $archivo->storeAs('creditos', $nombreArchivo, 'public');
+                            
+                            // Guardar ruta del archivo en la base de datos
+                            $datosCredito[$campo->nombre_campo] = $rutaArchivo;
+                        } else {
+                            $datosCredito[$campo->nombre_campo] = null;
+                        }
+                    } else {
+                        // Para campos que no son archivo
+                        $valorCampo = $request->input('campo_' . $campo->nombre_campo);
+                        
+                        // Validar campos requeridos
+                        if ($campo->requerido && empty($valorCampo)) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'El campo "' . $campo->alias . '" es obligatorio'
+                            ], 422);
+                        }
+                        
+                        // Asignar valor al campo
+                        $datosCredito[$campo->nombre_campo] = $valorCampo;
                     }
-                    
-                    // Asignar valor al campo
-                    $datosCredito[$campo->nombre_campo] = $valorCampo;
                 }
             }
             
-            // Insertar en la tabla dinámica
+            // Si es una simulación, no guardar en la base de datos, solo calcular el plan de pago
+            if ($esSimulacion) {
+                // Obtener campos del tipo de crédito para la simulación
+                $campos = $tipoCredito->campos()->get();
+                
+                // Buscar el campo marcado como monto transaccional
+                $campoMontoTransaccional = $campos->where('monto_transaccional', true)->first();
+                
+                // Calcular el plan de pago para la simulación
+                $planPago = $this->calcularPlanPagoSimulacion($tipoCredito, $datosCredito, $tipoAmortizacion);
+                
+                // Preparar datos del crédito para mostrar en el modal
+                $datosCreditoModal = [
+                    'cliente_id' => $clienteId,
+                    'tipo_amortizacion' => $tipoAmortizacion->nombre,
+                    'monto' => $campoMontoTransaccional ? ($datosCredito[$campoMontoTransaccional->nombre_campo] ?? 'N/A') : 'N/A',
+                    'plazo' => $this->calcularPlazoTotal($tipoCredito, $datosCredito)
+                ];
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Simulación calculada exitosamente',
+                    'plan_pago' => $planPago,
+                    'datos_credito' => $datosCreditoModal
+                ]);
+            }
+            
+            // Insertar en la tabla dinámica (solo si no es simulación)
             $creditoId = \DB::table($tipoCredito->tabla_credito)->insertGetId($datosCredito);
             
             // Log para debugging
@@ -1592,5 +1669,134 @@ class TipoCreditoController extends Controller
             }
         }
         return null;
+    }
+    
+    /**
+     * Calcular plan de pago para simulación
+     */
+    private function calcularPlanPagoSimulacion($tipoCredito, $datosCredito, $tipoAmortizacion)
+    {
+        try {
+            // Obtener campos del tipo de crédito
+            $campos = $tipoCredito->campos()->get();
+            
+            // Buscar el campo marcado como monto transaccional
+            $campoMontoTransaccional = $campos->where('monto_transaccional', true)->first();
+            if (!$campoMontoTransaccional) {
+                throw new \Exception('No se encontró un campo marcado como monto transaccional');
+            }
+            
+            // Buscar el campo marcado como fecha de ejecución
+            $campoFechaEjecucion = $campos->where('fecha_ejecucion', true)->first();
+            if (!$campoFechaEjecucion) {
+                throw new \Exception('No se encontró un campo marcado como fecha de ejecución');
+            }
+            
+            // Obtener el monto del crédito
+            $monto = $datosCredito[$campoMontoTransaccional->nombre_campo];
+            if (!$monto || $monto <= 0) {
+                throw new \Exception('El monto del crédito no es válido');
+            }
+            
+            // Obtener la fecha de ejecución del crédito
+            $fechaEjecucion = $datosCredito[$campoFechaEjecucion->nombre_campo];
+            if (!$fechaEjecucion) {
+                throw new \Exception('La fecha de ejecución del crédito no es válida');
+            }
+            
+            $fechaEjecucion = \Carbon\Carbon::parse($fechaEjecucion);
+            
+            // Buscar campos de tipo cuota que estén seleccionados (valor = 1)
+            $camposCuotaSeleccionados = [];
+            foreach ($campos as $campo) {
+                if ($campo->tipo_campo === 'cuota' && $datosCredito[$campo->nombre_campo] == 1) {
+                    $camposCuotaSeleccionados[] = $campo;
+                }
+            }
+            
+            if (empty($camposCuotaSeleccionados)) {
+                throw new \Exception('No se encontró ninguna cuota seleccionada');
+            }
+            
+            // Obtener las cuotas y tasas asociadas
+            $planPago = [];
+            $totalPagar = 0;
+            $interesTotal = 0;
+            
+            foreach ($camposCuotaSeleccionados as $campoCuota) {
+                // Obtener la cuota asociada a este campo usando credito_cuota_id
+                $cuota = \App\Models\CreditoCuota::where('id', $campoCuota->credito_cuota_id)->first();
+                
+                if (!$cuota) {
+                    continue;
+                }
+                
+                // Generar las cuotas basándose en el numero_cuota
+                $totalCuotas = $cuota->numero_cuota;
+                
+                for ($i = 1; $i <= $totalCuotas; $i++) {
+                    // Calcular la fecha de vencimiento sumando meses a la fecha de ejecución
+                    $fechaVencimiento = $fechaEjecucion->copy()->addMonths($i);
+                    
+                    $cuotaCalculada = $this->calcularCuota(
+                        $monto,
+                        $i, // Número de cuota actual
+                        $cuota->tasa,
+                        $tipoAmortizacion->nombre,
+                        $fechaVencimiento,
+                        $totalCuotas
+                    );
+                    
+                    $planPago['cuotas'][] = [
+                        'fecha' => $cuotaCalculada['fecha_vencimiento'],
+                        'capital' => $cuotaCalculada['capital'],
+                        'interes' => $cuotaCalculada['interes'],
+                        'total' => $cuotaCalculada['cuota'],
+                        'saldo' => $cuotaCalculada['saldo']
+                    ];
+                    
+                    $totalPagar += $cuotaCalculada['cuota'];
+                    $interesTotal += $cuotaCalculada['interes'];
+                }
+            }
+            
+            // Ordenar por número de cuota
+            usort($planPago['cuotas'], function($a, $b) {
+                return strtotime($a['fecha']) <=> strtotime($b['fecha']);
+            });
+            
+            // Calcular cuota promedio
+            $cuotaPromedio = count($planPago['cuotas']) > 0 ? $totalPagar / count($planPago['cuotas']) : 0;
+            
+            $planPago['total_pagar'] = round($totalPagar, 2);
+            $planPago['interes_total'] = round($interesTotal, 2);
+            $planPago['cuota_promedio'] = round($cuotaPromedio, 2);
+            
+            return $planPago;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error al calcular plan de pago de simulación: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Calcular plazo total del crédito
+     */
+    private function calcularPlazoTotal($tipoCredito, $datosCredito)
+    {
+        $campos = $tipoCredito->campos()->get();
+        $plazoTotal = 0;
+        
+        foreach ($campos as $campo) {
+            if ($campo->tipo_campo === 'cuota' && $datosCredito[$campo->nombre_campo] == 1) {
+                $cuota = \App\Models\CreditoCuota::where('id', $campo->credito_cuota_id)->first();
+                if ($cuota) {
+                    $plazoTotal += $cuota->numero_cuota;
+                }
+            }
+        }
+        
+        return $plazoTotal;
     }
 }

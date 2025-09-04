@@ -17,20 +17,7 @@ class TipoCliente extends Model
         'empresa_id'
     ];
 
-    /**
-     * Boot del modelo
-     */
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($tipoCliente) {
-            // Asignar empresa_id del usuario autenticado
-            if (auth()->check() && auth()->user()->empresa_id) {
-                $tipoCliente->empresa_id = auth()->user()->empresa_id;
-            }
-        });
-    }
+
 
     protected $casts = [
         'created_at' => 'datetime',
@@ -55,11 +42,17 @@ class TipoCliente extends Model
         if (!Schema::hasTable($tablaNombre)) {
             Schema::create($tablaNombre, function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('cliente_id');
+                
+                // Campos predefinidos para contacto
+                $table->string('telefono', 20)->nullable();
+                $table->string('correo', 255)->nullable();
+                $table->text('direccion')->nullable();
+                
                 $table->timestamps();
                 
-                // Índice para cliente_id
-                $table->index('cliente_id', 'idx_cliente_id');
+                // Índices para mejorar rendimiento
+                $table->index('telefono');
+                $table->index('correo');
             });
         }
     }
@@ -117,5 +110,65 @@ class TipoCliente extends Model
     public function scopePorEmpresa($query, $empresaId)
     {
         return $query->where('empresa_id', $empresaId);
+    }
+
+    /**
+     * Crear campos predefinidos para este tipo de cliente
+     */
+    public function crearCamposPredefinidos()
+    {
+        $camposPredefinidos = [
+            [
+                'nombre_campo' => 'telefono',
+                'alias' => 'Teléfono',
+                'tipo_campo' => 'numero',
+                'requerido' => true,
+                'es_unico' => true,
+                'orden' => 1
+            ],
+            [
+                'nombre_campo' => 'correo',
+                'alias' => 'Correo Electrónico',
+                'tipo_campo' => 'texto',
+                'requerido' => true,
+                'es_unico' => true,
+                'orden' => 2
+            ],
+            [
+                'nombre_campo' => 'direccion',
+                'alias' => 'Dirección',
+                'tipo_campo' => 'texto',
+                'requerido' => true,
+                'es_unico' => true,
+                'orden' => 3
+            ]
+        ];
+
+        foreach ($camposPredefinidos as $campo) {
+            $this->campos()->create($campo);
+        }
+    }
+
+    /**
+     * Boot del modelo - crear tabla y campos automáticamente
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($tipoCliente) {
+            // Asignar empresa_id del usuario autenticado
+            if (auth()->check() && auth()->user()->empresa_id) {
+                $tipoCliente->empresa_id = auth()->user()->empresa_id;
+            }
+        });
+
+        static::created(function ($tipoCliente) {
+            // Crear tabla base automáticamente
+            $tipoCliente->crearTablaBase();
+            
+            // Crear campos predefinidos automáticamente
+            $tipoCliente->crearCamposPredefinidos();
+        });
     }
 }

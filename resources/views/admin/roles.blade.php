@@ -1,5 +1,6 @@
-<x-app-layout>
-    <x-slot name="title">Roles</x-slot>
+@extends('layouts.app')
+
+@section('content')
     
     @php
         $breadcrumbs = [
@@ -136,4 +137,4 @@
         }
     </script>
     @endpush
-</x-app-layout>
+@endsection
